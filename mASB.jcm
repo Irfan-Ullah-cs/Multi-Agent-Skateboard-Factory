@@ -1,0 +1,27 @@
+/*
+    mASB
+    ---------------------------
+
+    JaCaMo Application File
+
+    This file defines the initial state of the MAS (initial agents, environment, organisation, ....)
+
+    (see jacamo/doc/jcm.html for more information about what can be defined in this file)
+
+    JaCaMo 1.3.0
+    November 21, 2025 - 09:07:30
+*/
+
+mas mASB {
+
+    agent bob: sample_agent.asl {
+      focus: w.c1 
+    }
+
+    workspace w {
+      artifact c1: example.Counter(3) 
+    }
+
+    
+
+}
