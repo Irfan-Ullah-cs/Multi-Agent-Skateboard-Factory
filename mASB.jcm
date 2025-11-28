@@ -12,16 +12,9 @@
     November 21, 2025 - 09:07:30
 */
 
-mas mASB {
-
-    agent bob: sample_agent.asl {
-      focus: w.c1 
-    }
-
-    workspace w {
-      artifact c1: example.Counter(3) 
-    }
-
+mas skateboard_phase1 {
+    agent ca1: customer_agent.asl
+    agent aa1: assembly_agent.asl
     
-
+    asl-path: "src/agt"
 }

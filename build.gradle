@@ -44,6 +44,7 @@ sourceSets {
             srcDir 'src/org'
             srcDir 'src/int'
             srcDir 'src/java'
+            srcDirs = ['src']
         }
         resources {
             srcDir 'src/resources'
