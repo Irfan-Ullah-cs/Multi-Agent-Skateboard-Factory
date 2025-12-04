@@ -12,9 +12,19 @@
     November 21, 2025 - 09:07:30
 */
 
+// mas skateboard_phase1 {
+//     agent ca1: customer_agent.asl
+//     agent aa1: assembly_agent.asl
+    
+//     asl-path: "src/agt"
+// }
+
 mas skateboard_phase1 {
     agent ca1: customer_agent.asl
     agent aa1: assembly_agent.asl
+    agent sa1: sa1.asl
+    agent sa2: sa2.asl
+    agent sa3: sa3.asl
     
     asl-path: "src/agt"
 }
