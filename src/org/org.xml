@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<!-- <?xml version="1.0" encoding="UTF-8"?>
 
 <?xml-stylesheet href="https://moise-lang.github.io/xml/os.xsl" type="text/xsl" ?>
 
@@ -76,4 +76,4 @@
     <norm id="norm1" type="obligation" role="role2" mission="mission1"/>
 </normative-specification>
 
-</organisational-specification>
+</organisational-specification> -->
