@@ -1,4 +1,7 @@
 // AuctionArtifact.java
+// Implements FIPA Contract Net Protocol for skateboard part procurement
+// Manages auction lifecycle from call-for-proposal to winner selection
+
 package tools;
 
 import cartago.Artifact;
@@ -12,15 +15,17 @@ public class AuctionArtifact extends Artifact {
     private List<String> openAuctions;
     private int auctionCounter;
     
+    // Initializes the auction environment with empty data structures
     @OPERATION
     public void init() {
         auctions = new HashMap<>();
         bids = new HashMap<>();
         openAuctions = new ArrayList<>();
         auctionCounter = 0;
-        System.out.println("[AuctionArtifact] Initialized");
+        System.out.println("[AuctionArtifact] Auction environment initialized");
     }
     
+    // Creates a new auction for a specific part type with constraints
     @OPERATION
     public void callForProposal(String partType, int quantity, 
                                 double maxPrice, int maxDelivery) {
@@ -41,10 +46,10 @@ public class AuctionArtifact extends Artifact {
         openAuctions.add(auctionID);
         
         defineObsProperty("auction_open", auctionID);
-        defineObsProperty("last_auction_id", auctionID);
-        System.out.println("[Auction] CFP opened: " + auctionID + " for " + partType);
+        System.out.println("[Auction] Call for Proposal created: " + auctionID + " for " + partType);
     }
     
+    // Processes bid submissions from supply agents for open auctions
     @OPERATION
     public void submitBid(String auctionID, String supplierID, 
                          double bidPrice, int deliveryTime) {
@@ -57,73 +62,40 @@ public class AuctionArtifact extends Artifact {
             bid.put("timestamp", System.currentTimeMillis());
             
             bids.get(auctionID).add(bid);
-            System.out.println("[Auction] Bid received: " + supplierID + " -> " + bidPrice);
+            System.out.println("[Auction] Bid received: " + supplierID + " -> " + bidPrice + " for " + auctionID);
         }
     }
     
+    // Retrieves detailed information about a specific auction
+    @OPERATION
+    public void getAuctionDetails(String auctionID) {
+        if (auctions.containsKey(auctionID)) {
+            Map<String, Object> auction = auctions.get(auctionID);
+            String partType = (String) auction.get("partType");
+            int quantity = (int) auction.get("quantity");
+            double maxPrice = (double) auction.get("maxPrice");
+            int maxDelivery = (int) auction.get("maxDelivery");
+            
+            defineObsProperty("auction_part_type", partType);
+            defineObsProperty("auction_quantity", quantity);
+            defineObsProperty("auction_max_price", maxPrice);
+            defineObsProperty("auction_max_delivery", maxDelivery);
+            
+            System.out.println("[Auction] Details for " + auctionID + ": " + partType + " (qty:" + quantity + ")");
+        }
+    }
+    
+    // Closes an auction and prevents further bid submissions
     @OPERATION
     public void closeAuction(String auctionID) {
         if (auctions.containsKey(auctionID)) {
             auctions.get(auctionID).put("status", "closed");
             defineObsProperty("auction_closed", auctionID);
-            System.out.println("[Auction] CFP closed: " + auctionID);
+            System.out.println("[Auction] Closed: " + auctionID);
         }
     }
     
-    @OPERATION
-    public void selectWinner(String auctionID, String winnerID, 
-                             double winPrice, int winDelivery) {
-        if (auctions.containsKey(auctionID)) {
-            Map<String, Object> auction = auctions.get(auctionID);
-            auction.put("winner", winnerID);
-            auction.put("winPrice", winPrice);
-            auction.put("winDelivery", winDelivery);
-            auction.put("status", "awarded");
-            
-            defineObsProperty("auction_awarded", auctionID);
-            System.out.println("[Auction] Winner selected for " + auctionID + ": " + winnerID + " @ $" + winPrice);
-        }
-    }
-    
-    @OPERATION
-    public void getBidsForAuction(String auctionID) {
-        if (bids.containsKey(auctionID)) {
-            List<Map<String, Object>> auctionBids = bids.get(auctionID);
-            defineObsProperty("bid_count", auctionBids.size());
-            
-            for (int i = 0; i < auctionBids.size(); i++) {
-                Map<String, Object> bid = auctionBids.get(i);
-                defineObsProperty("bid_" + i, bid.toString());
-            }
-            System.out.println("[Auction] Retrieved " + auctionBids.size() + " bids for " + auctionID);
-        }
-    }
-    
-    @OPERATION
-    public void getAllBidsForAuction(String auctionID) {
-        if (bids.containsKey(auctionID)) {
-            List<Map<String, Object>> auctionBids = bids.get(auctionID);
-            
-            for (int i = 0; i < auctionBids.size(); i++) {
-                Map<String, Object> bid = auctionBids.get(i);
-                String bidStr = bid.get("supplierID") + ":" + 
-                            bid.get("bidPrice") + ":" + 
-                            bid.get("deliveryTime");
-                defineObsProperty("bid_" + i, bidStr);
-            }
-            defineObsProperty("total_bids", auctionBids.size());
-            System.out.println("[Auction] Bids returned for " + auctionID + ": " + auctionBids.size());
-        }
-    }
-    
-    @OPERATION
-    public void getOpenAuctions() {
-        String auctionList = String.join(",", openAuctions);
-        defineObsProperty("all_open_auctions", auctionList);
-        defineObsProperty("total_open_auctions", openAuctions.size());
-        System.out.println("[Auction] Total open auctions: " + openAuctions.size() + " -> " + auctionList);
-    }
-    
+    // Evaluates all bids and determines the winning bid based on constraints
     @OPERATION
     public void getBestBid(String auctionID, double maxPrice, int maxDelivery) {
         if (bids.containsKey(auctionID)) {
@@ -132,14 +104,21 @@ public class AuctionArtifact extends Artifact {
             Map<String, Object> bestBid = null;
             double bestPrice = Double.MAX_VALUE;
             
+            System.out.println("[Auction] Evaluating " + auctionBids.size() + " bids for " + auctionID);
+            
             for (Map<String, Object> bid : auctionBids) {
                 double bidPrice = (double) bid.get("bidPrice");
                 int deliveryTime = (int) bid.get("deliveryTime");
+                String supplierID = (String) bid.get("supplierID");
                 
+                System.out.println("[Auction] Checking bid: " + supplierID + " @ $" + bidPrice + ", delivery: " + deliveryTime + "h");
+                
+                // Check if bid meets constraints
                 if (bidPrice <= maxPrice && deliveryTime <= maxDelivery) {
                     if (bidPrice < bestPrice) {
                         bestPrice = bidPrice;
                         bestBid = bid;
+                        System.out.println("[Auction] New best bid: " + supplierID + " @ $" + bidPrice);
                     }
                 }
             }
@@ -160,25 +139,32 @@ public class AuctionArtifact extends Artifact {
         }
     }
     
+    // Finds the first open auction for a specific part type
     @OPERATION
     public void getAuctionIDForPart(String partType) {
         String auctionID = null;
         
+        // Find first matching auction for this part type
         for (String id : openAuctions) {
-            if (id.contains("_" + partType + "_")) {
-                auctionID = id;
+            if (auctions.containsKey(id)) {
+                String auctionPartType = (String) auctions.get(id).get("partType");
+                if (partType.equals(auctionPartType)) {
+                    auctionID = id;
+                    break; // Take first match
+                }
             }
         }
         
         if (auctionID != null) {
             defineObsProperty("auction_id_for_part", auctionID);
-            System.out.println("[Auction] Auction ID for " + partType + ": " + auctionID);
+            System.out.println("[Auction] First open auction for " + partType + ": " + auctionID);
         } else {
             defineObsProperty("auction_id_for_part", "not_found");
             System.out.println("[Auction] No open auction found for part: " + partType);
         }
     }
     
+    // Finalizes auction by awarding contract to winning supplier
     @OPERATION
     public void processWinner(String auctionID, String winnerID, double winPrice, int winDelivery) {
         if (auctions.containsKey(auctionID)) {
@@ -189,10 +175,38 @@ public class AuctionArtifact extends Artifact {
             auction.put("winPrice", winPrice);
             auction.put("winDelivery", winDelivery);
             
+            // Remove from open auctions list
             openAuctions.remove(auctionID);
             
             defineObsProperty("auction_awarded", auctionID);
             System.out.println("[Auction] Awarded " + auctionID + " to " + winnerID + " @ $" + winPrice);
         }
+    }
+    
+    // Retrieves all bids for a specific auction for analysis purposes
+    @OPERATION
+    public void getAllBidsForAuction(String auctionID) {
+        if (bids.containsKey(auctionID)) {
+            List<Map<String, Object>> auctionBids = bids.get(auctionID);
+            
+            for (int i = 0; i < auctionBids.size(); i++) {
+                Map<String, Object> bid = auctionBids.get(i);
+                String bidInfo = bid.get("supplierID") + ":" + 
+                               bid.get("bidPrice") + ":" + 
+                               bid.get("deliveryTime");
+                defineObsProperty("bid_" + i, bidInfo);
+            }
+            defineObsProperty("total_bids", auctionBids.size());
+            System.out.println("[Auction] Retrieved " + auctionBids.size() + " bids for " + auctionID);
+        }
+    }
+    
+    // Provides summary of all currently open auctions
+    @OPERATION
+    public void getOpenAuctions() {
+        String auctionList = String.join(",", openAuctions);
+        defineObsProperty("all_open_auctions", auctionList);
+        defineObsProperty("total_open_auctions", openAuctions.size());
+        System.out.println("[Auction] Open auctions (" + openAuctions.size() + "): " + auctionList);
     }
 }
