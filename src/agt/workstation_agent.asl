@@ -32,7 +32,7 @@
     lookupArtifact("workstation_registry", RegID);
     focus(RegID);
     registerWorkstation(WSID, Type, Energy, Time)[artifact_id(RegID)];
-    .println("[", WSID, "] ✓ Successfully registered with registry");
+    .println("[", WSID, "]  Successfully registered with registry");
     +registered.
 
 -!register_with_registry(WSID, Type, Energy, Time) <-
@@ -55,14 +55,14 @@
     my_energy(Energy) <-
     
     .println("");
-    .println("[", WSID, "] ╔══════════════════════════════════════╗");
-    .println("[", WSID, "] ║  EXECUTING OPERATION                 ║");
-    .println("[", WSID, "] ╠══════════════════════════════════════╣");
-    .println("[", WSID, "] ║  Order: ", OrderID);
-    .println("[", WSID, "] ║  Type: ", StationType);
-    .println("[", WSID, "] ║  Duration: ", ExecTime, " time units");
-    .println("[", WSID, "] ║  Energy: ", Energy, " units");
-    .println("[", WSID, "] ╚══════════════════════════════════════╝");
+    .println("[", WSID, "]");
+    .println("[", WSID, "]   EXECUTING OPERATION                 ");
+    .println("[", WSID, "] ");
+    .println("[", WSID, "]   Order: ", OrderID);
+    .println("[", WSID, "]   Type: ", StationType);
+    .println("[", WSID, "]   Duration: ", ExecTime, " time units");
+    .println("[", WSID, "]   Energy: ", Energy, " units");
+    .println("[", WSID, "] ");
     
     // Mark as busy
     +executing(OrderID, StationType);
@@ -75,7 +75,7 @@
     .println("[", WSID, "] Processing... (", ExecutionMs, "ms)");
     .wait(ExecutionMs);
     
-    .println("[", WSID, "] ✓ Operation complete!");
+    .println("[", WSID, "]  Operation complete!");
     
     // Mark as done
     -executing(OrderID, StationType);
@@ -100,7 +100,7 @@
     -executing(OrderID, StationType);
     
     .send(aa1, tell, workstation_complete(OrderID, StationType, WSID));
-    .println("[", WSID, "] ✓ Complete").
+    .println("[", WSID, "]  Complete").
 
 // Error handler
 -!execute_operation(OrderID, StationType) : workstation_id(WSID) <-

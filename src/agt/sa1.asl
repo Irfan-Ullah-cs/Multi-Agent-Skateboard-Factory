@@ -87,13 +87,13 @@ can_supply(connectivity, 120, 24, 0.91).  // Price: $120, Delivery: 24h, Reputat
 
 +!deliver_part(OrderID, PartType, DeliveryTime) : supplier_id(SID) <-
     .println("");
-    .println("[SA1] ┌────────────────────────────────────┐");
-    .println("[SA1] │  DELIVERY REQUEST                  │");
-    .println("[SA1] ├────────────────────────────────────┤");
-    .println("[SA1] │  Order: ", OrderID);
-    .println("[SA1] │  Part: ", PartType);
-    .println("[SA1] │  ETA: ", DeliveryTime, " hours");
-    .println("[SA1] └────────────────────────────────────┘");
+    .println("");
+    .println("[SA1]   DELIVERY REQUEST                  ");
+    .println("[SA1]");
+    .println("[SA1]   Order: ", OrderID);
+    .println("[SA1]   Part: ", PartType);
+    .println("[SA1]   ETA: ", DeliveryTime, " hours");
+    .println("[SA1]");
     
     +delivering(OrderID, PartType);
     
@@ -102,7 +102,7 @@ can_supply(connectivity, 120, 24, 0.91).  // Price: $120, Delivery: 24h, Reputat
     .println("[SA1] Shipping... (", DeliveryMs, "ms)");
     .wait(DeliveryMs);
     
-    .println("[SA1] ✓ DELIVERED: ", PartType, " for ", OrderID);
+    .println("[SA1]  DELIVERED: ", PartType, " for ", OrderID);
     
     // Notify assembly agent
     .send(aa1, tell, part_delivered(OrderID, PartType));

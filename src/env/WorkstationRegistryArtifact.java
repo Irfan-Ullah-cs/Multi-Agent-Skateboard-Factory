@@ -138,15 +138,15 @@ public class WorkstationRegistryArtifact extends Artifact {
                 allocations.put(workstationID, orderID);
                 
                 updateObsProperty("allocation_result", "success");
-                System.out.println("[Registry] ✓ Allocated " + workstationID + " to order: " + orderID);
+                System.out.println("[Registry]  Allocated " + workstationID + " to order: " + orderID);
             } else {
                 String currentOrder = allocations.get(workstationID);
                 updateObsProperty("allocation_result", "busy");
-                System.out.println("[Registry] ✗ " + workstationID + " busy with order: " + currentOrder);
+                System.out.println("[Registry]  " + workstationID + " busy with order: " + currentOrder);
             }
         } else {
             updateObsProperty("allocation_result", "not_found");
-            System.out.println("[Registry] ✗ Workstation not found: " + workstationID);
+            System.out.println("[Registry]  Workstation not found: " + workstationID);
         }
     }
     

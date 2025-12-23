@@ -1,79 +1,398 @@
-<!-- <?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 
 <?xml-stylesheet href="https://moise-lang.github.io/xml/os.xsl" type="text/xsl" ?>
 
 <organisational-specification
-    id="mASB"
+    id="skateboard_assembly_org"
     os-version="1.1"
 
     xmlns='http://moise.sourceforge.net/os'
     xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
-    xsi:schemaLocation='hhttp://moise.sourceforge.net/os
+    xsi:schemaLocation='http://moise.sourceforge.net/os
                         https://moise-lang.github.io/xml/os.xsd' >
 
+<!-- ============================================================
+     STRUCTURAL SPECIFICATION
+     Defines roles, groups, and relationships between agents
+     ============================================================ -->
 <structural-specification>
 
-<role-definitions>
-    <role id="role1" />
-    <role id="role2" />
-</role-definitions>
+    <role-definitions>
+        <!-- Customer role - submits orders -->
+        <role id="customer" />
+        
+        <!-- Assembly Manager - coordinates entire process -->
+        <role id="assemblyManager" />
+        
+        <!-- Supplier roles - provide parts -->
+        <role id="supplier" />
+        <role id="boardSupplier">
+            <extends role="supplier" />
+        </role>
+        <role id="trunkSupplier">
+            <extends role="supplier" />
+        </role>
+        <role id="wheelSupplier">
+            <extends role="supplier" />
+        </role>
+        <role id="railSupplier">
+            <extends role="supplier" />
+        </role>
+        <role id="connectivitySupplier">
+            <extends role="supplier" />
+        </role>
+        
+        <!-- Workstation roles - execute assembly operations -->
+        <role id="assembler" />
+        <role id="trunkAssembler">
+            <extends role="assembler" />
+        </role>
+        <role id="wheelsAssembler">
+            <extends role="assembler" />
+        </role>
+        <role id="railsAssembler">
+            <extends role="assembler" />
+        </role>
+        <role id="connectivityAssembler">
+            <extends role="assembler" />
+        </role>
+        <role id="qualityController">
+            <extends role="assembler" />
+        </role>
+    </role-definitions>
 
-<group-specification id="group1">
-    <roles>
-        <role id="role1" min="1" max="1"/>
-        <role id="role2" min="1" max="1"/>
-    </roles>
+    <!-- Main Assembly Plant Group -->
+    <group-specification id="assemblyPlant">
+        <roles>
+            <role id="assemblyManager" min="1" max="1" />
+        </roles>
+        
+        <!-- Subgroups -->
+        <subgroups>
+            <group-specification id="customerGroup">
+                <roles>
+                    <role id="customer" min="1" max="5" />
+                </roles>
+                <links>
+                    <link from="customer" to="assemblyManager" type="communication" scope="inter-group" />
+                </links>
+            </group-specification>
+            
+            <group-specification id="supplierGroup">
+                <roles>
+                    <role id="supplier" min="3" max="5" />
+                </roles>
+                <links>
+                    <link from="assemblyManager" to="supplier" type="authority" scope="inter-group" />
+                    <link from="supplier" to="assemblyManager" type="communication" scope="inter-group" />
+                </links>
+                <formation-constraints>
+                    <compatibility from="boardSupplier" to="trunkSupplier" />
+                    <compatibility from="boardSupplier" to="wheelSupplier" />
+                    <compatibility from="boardSupplier" to="railSupplier" />
+                    <compatibility from="boardSupplier" to="connectivitySupplier" />
+                </formation-constraints>
+            </group-specification>
+            
+            <group-specification id="workstationGroup">
+                <roles>
+                    <role id="trunkAssembler" min="1" max="2" />
+                    <role id="wheelsAssembler" min="1" max="2" />
+                    <role id="railsAssembler" min="1" max="2" />
+                    <role id="connectivityAssembler" min="1" max="1" />
+                    <role id="qualityController" min="1" max="2" />
+                </roles>
+                <links>
+                    <link from="assemblyManager" to="assembler" type="authority" scope="inter-group" />
+                    <link from="assembler" to="assemblyManager" type="communication" scope="inter-group" />
+                </links>
+            </group-specification>
+        </subgroups>
+        
+        <links>
+            <link from="assemblyManager" to="customer" type="communication" scope="inter-group" />
+        </links>
+    </group-specification>
 
-    <links>
-       <link from="role1" to="role2" type="authority"     scope="intra-group" bi-dir="false"/>
-       <link from="role2" to="role1" type="communication" scope="intra-group" bi-dir="false"/>
-    </links>
-    <formation-constraints>
-       <compatibility from="role1" to="role2" />
-    </formation-constraints>
-</group-specification>
 </structural-specification>
 
+<!-- ============================================================
+     FUNCTIONAL SPECIFICATION
+     Defines goals, plans, and missions for skateboard assembly
+     ============================================================ -->
 <functional-specification>
-    <scheme id="scheme1">
-        <goal id="goal1">
+
+    <!-- Main Assembly Scheme - Full skateboard with all options -->
+    <scheme id="assembleFullSkateboard">
+        
+        <goal id="skateboardComplete" ds="Complete skateboard assembly">
             <plan operator="sequence">
-                <goal id="goal2"    ttf="20 minutes" ds="description goal2"/>
-                <goal id="goal3"/>
-                <goal id="goal4"/>
+                
+                <!-- Phase 1: Order Processing -->
+                <goal id="orderProcessed" ds="Process customer order">
+                    <plan operator="sequence">
+                        <goal id="orderReceived" ttf="1 minute" ds="Receive order from customer" />
+                        <goal id="orderValidated" ttf="1 minute" ds="Validate order specifications" />
+                    </plan>
+                </goal>
+                
+                <!-- Phase 2: Contracting -->
+                <goal id="contractingComplete" ds="Contract all required parts">
+                    <plan operator="parallel">
+                        <goal id="boardContracted" ttf="5 minutes" ds="Contract board supplier" />
+                        <goal id="trunksContracted" ttf="5 minutes" ds="Contract trunk supplier" />
+                        <goal id="wheelsContracted" ttf="5 minutes" ds="Contract wheels supplier" />
+                        <goal id="railsContracted" ttf="5 minutes" ds="Contract rails supplier" />
+                        <goal id="connectivityContracted" ttf="5 minutes" ds="Contract connectivity supplier" />
+                    </plan>
+                </goal>
+                
+                <!-- Phase 3: Allocation -->
+                <goal id="allocationComplete" ds="Allocate all workstations">
+                    <plan operator="sequence">
+                        <goal id="trunkWSAllocated" ttf="2 minutes" ds="Allocate trunk workstation" />
+                        <goal id="wheelsWSAllocated" ttf="2 minutes" ds="Allocate wheels workstation" />
+                        <goal id="railsWSAllocated" ttf="2 minutes" ds="Allocate rails workstation" />
+                        <goal id="connectivityWSAllocated" ttf="2 minutes" ds="Allocate connectivity workstation" />
+                        <goal id="qualityWSAllocated" ttf="2 minutes" ds="Allocate quality workstation" />
+                    </plan>
+                </goal>
+                
+                <!-- Phase 4: Assembly Execution -->
+                <goal id="assemblyComplete" ds="Execute assembly operations">
+                    <plan operator="sequence">
+                        <goal id="partsDelivered" ds="All parts delivered">
+                            <plan operator="parallel">
+                                <goal id="boardDelivered" ttf="30 minutes" ds="Board delivered" />
+                                <goal id="trunksDelivered" ttf="30 minutes" ds="Trunks delivered" />
+                                <goal id="wheelsDelivered" ttf="30 minutes" ds="Wheels delivered" />
+                                <goal id="railsDelivered" ttf="30 minutes" ds="Rails delivered" />
+                                <goal id="connectivityDelivered" ttf="30 minutes" ds="Connectivity box delivered" />
+                            </plan>
+                        </goal>
+                        <goal id="trunksAssembled" ttf="25 minutes" ds="Assemble trunks to board" />
+                        <goal id="wheelsAssembled" ttf="20 minutes" ds="Mount wheels to trunks" />
+                        <goal id="railsAssembled" ttf="22 minutes" ds="Attach rails to board" />
+                        <goal id="connectivityInstalled" ttf="30 minutes" ds="Install connectivity box" />
+                        <goal id="qualityPassed" ttf="15 minutes" ds="Pass quality control" />
+                    </plan>
+                </goal>
+                
+                <!-- Final: Delivery -->
+                <goal id="orderDelivered" ttf="5 minutes" ds="Deliver to customer" />
+                
             </plan>
         </goal>
-
-        <mission id="mission1" min="1" max="1">
-            <goal id="goal2"/>
-            <goal id="goal4"/>
+        
+        <!-- Mission Definitions -->
+        
+        <!-- Customer Mission -->
+        <mission id="mCustomer" min="1" max="1">
+            <goal id="orderReceived" />
+            <goal id="orderDelivered" />
         </mission>
-        <mission id="mission2" min="1" max="1">
-            <goal id="goal3"/>
+        
+        <!-- Assembly Manager Mission -->
+        <mission id="mAssemblyManager" min="1" max="1">
+            <goal id="orderValidated" />
+            <goal id="contractingComplete" />
+            <goal id="allocationComplete" />
+            <goal id="assemblyComplete" />
         </mission>
+        
+        <!-- Supplier Missions -->
+        <mission id="mBoardSupply" min="1" max="1">
+            <goal id="boardContracted" />
+            <goal id="boardDelivered" />
+        </mission>
+        
+        <mission id="mTrunkSupply" min="1" max="1">
+            <goal id="trunksContracted" />
+            <goal id="trunksDelivered" />
+        </mission>
+        
+        <mission id="mWheelSupply" min="1" max="1">
+            <goal id="wheelsContracted" />
+            <goal id="wheelsDelivered" />
+        </mission>
+        
+        <mission id="mRailSupply" min="1" max="1">
+            <goal id="railsContracted" />
+            <goal id="railsDelivered" />
+        </mission>
+        
+        <mission id="mConnectivitySupply" min="1" max="1">
+            <goal id="connectivityContracted" />
+            <goal id="connectivityDelivered" />
+        </mission>
+        
+        <!-- Assembler Missions -->
+        <mission id="mTrunkAssembly" min="1" max="1">
+            <goal id="trunkWSAllocated" />
+            <goal id="trunksAssembled" />
+        </mission>
+        
+        <mission id="mWheelsAssembly" min="1" max="1">
+            <goal id="wheelsWSAllocated" />
+            <goal id="wheelsAssembled" />
+        </mission>
+        
+        <mission id="mRailsAssembly" min="1" max="1">
+            <goal id="railsWSAllocated" />
+            <goal id="railsAssembled" />
+        </mission>
+        
+        <mission id="mConnectivityAssembly" min="1" max="1">
+            <goal id="connectivityWSAllocated" />
+            <goal id="connectivityInstalled" />
+        </mission>
+        
+        <mission id="mQualityControl" min="1" max="1">
+            <goal id="qualityWSAllocated" />
+            <goal id="qualityPassed" />
+        </mission>
+        
     </scheme>
+    
+    <!-- Basic Skateboard Scheme (no rails, no connectivity) -->
+    <scheme id="assembleBasicSkateboard">
+        
+        <goal id="basicSkateboardComplete" ds="Complete basic skateboard">
+            <plan operator="sequence">
+                <goal id="basicOrderProcessed" ds="Process basic order">
+                    <plan operator="sequence">
+                        <goal id="basicOrderReceived" ttf="1 minute" />
+                        <goal id="basicOrderValidated" ttf="1 minute" />
+                    </plan>
+                </goal>
+                
+                <goal id="basicContractingComplete" ds="Contract basic parts">
+                    <plan operator="parallel">
+                        <goal id="basicBoardContracted" ttf="5 minutes" />
+                        <goal id="basicTrunksContracted" ttf="5 minutes" />
+                        <goal id="basicWheelsContracted" ttf="5 minutes" />
+                    </plan>
+                </goal>
+                
+                <goal id="basicAllocationComplete" ds="Allocate basic workstations">
+                    <plan operator="sequence">
+                        <goal id="basicTrunkWSAllocated" ttf="2 minutes" />
+                        <goal id="basicWheelsWSAllocated" ttf="2 minutes" />
+                        <goal id="basicQualityWSAllocated" ttf="2 minutes" />
+                    </plan>
+                </goal>
+                
+                <goal id="basicAssemblyComplete" ds="Execute basic assembly">
+                    <plan operator="sequence">
+                        <goal id="basicPartsDelivered" ds="Basic parts delivered">
+                            <plan operator="parallel">
+                                <goal id="basicBoardDelivered" ttf="30 minutes" />
+                                <goal id="basicTrunksDelivered" ttf="30 minutes" />
+                                <goal id="basicWheelsDelivered" ttf="30 minutes" />
+                            </plan>
+                        </goal>
+                        <goal id="basicTrunksAssembled" ttf="25 minutes" />
+                        <goal id="basicWheelsAssembled" ttf="20 minutes" />
+                        <goal id="basicQualityPassed" ttf="15 minutes" />
+                    </plan>
+                </goal>
+                
+                <goal id="basicOrderDelivered" ttf="5 minutes" />
+            </plan>
+        </goal>
+        
+        <mission id="mBasicCustomer" min="1" max="1">
+            <goal id="basicOrderReceived" />
+            <goal id="basicOrderDelivered" />
+        </mission>
+        
+        <mission id="mBasicManager" min="1" max="1">
+            <goal id="basicOrderValidated" />
+            <goal id="basicContractingComplete" />
+            <goal id="basicAllocationComplete" />
+            <goal id="basicAssemblyComplete" />
+        </mission>
+        
+    </scheme>
+
 </functional-specification>
 
+<!-- ============================================================
+     NORMATIVE SPECIFICATION
+     Defines obligations and permissions for roles
+     ============================================================ -->
 <normative-specification>
-    <!--
-       setup of Moise properties (e.g. role compatibility) handling (regimented or not)
 
-       when value = "fail", the platform ensures that the property is not broken (the property is thus regiment)
-       when value = "prohibition", violations are produced when the property is not followed by the agents
-       when value = "ignore", no norm is produced 
-
-       possible properties are defined in https://github.com/moise-lang/moise/blob/master/src/main/java/ora4mas/nopl/tools/os2nopl.java
-
-       some examples follow
-    -->
-    <!-- properties>
-        <property id="default_management"  value="fail" />
-        <property id="role_compatibility"  value="prohibition" />
+    <properties>
+        <property id="default_management" value="fail" />
+        <property id="role_compatibility" value="prohibition" />
         <property id="mission_cardinality" value="prohibition" />
-    </properties-->
+    </properties>
 
-    <!-- the norms of the application -->
-    <norm id="norm1" type="obligation" role="role2" mission="mission1"/>
+    <!-- Customer Obligations -->
+    <norm id="nCustomerOrder" 
+          type="obligation" 
+          role="customer" 
+          mission="mCustomer" />
+    
+    <!-- Assembly Manager Obligations -->
+    <norm id="nManagerCoordinate" 
+          type="obligation" 
+          role="assemblyManager" 
+          mission="mAssemblyManager" />
+    
+    <!-- Supplier Obligations -->
+    <norm id="nBoardSupply" 
+          type="obligation" 
+          role="boardSupplier" 
+          mission="mBoardSupply" />
+          
+    <norm id="nTrunkSupply" 
+          type="obligation" 
+          role="trunkSupplier" 
+          mission="mTrunkSupply" />
+          
+    <norm id="nWheelSupply" 
+          type="obligation" 
+          role="wheelSupplier" 
+          mission="mWheelSupply" />
+          
+    <norm id="nRailSupply" 
+          type="obligation" 
+          role="railSupplier" 
+          mission="mRailSupply" />
+          
+    <norm id="nConnectivitySupply" 
+          type="obligation" 
+          role="connectivitySupplier" 
+          mission="mConnectivitySupply" />
+    
+    <!-- Assembler Obligations -->
+    <norm id="nTrunkAssembly" 
+          type="obligation" 
+          role="trunkAssembler" 
+          mission="mTrunkAssembly" />
+          
+    <norm id="nWheelsAssembly" 
+          type="obligation" 
+          role="wheelsAssembler" 
+          mission="mWheelsAssembly" />
+          
+    <norm id="nRailsAssembly" 
+          type="obligation" 
+          role="railsAssembler" 
+          mission="mRailsAssembly" />
+          
+    <norm id="nConnectivityAssembly" 
+          type="obligation" 
+          role="connectivityAssembler" 
+          mission="mConnectivityAssembly" />
+          
+    <norm id="nQualityControl" 
+          type="obligation" 
+          role="qualityController" 
+          mission="mQualityControl" />
+
 </normative-specification>
 
-</organisational-specification> -->
+</organisational-specification>
