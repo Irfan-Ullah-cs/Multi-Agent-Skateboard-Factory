@@ -14,87 +14,102 @@ can_supply(connectivity, 110, 20, 0.94).  // Price: $110, Delivery: 20h, Reputat
 
 !start.
 
-// Initializes the supply agent and begins the auction monitoring process
 +!start : supplier_id(SID) <-
     .println("[", SID, "] Quality & Reputation Supply Agent Started");
     .wait(2000);
     !monitor_auctions.
 
-// Establishes connection to the auction environment and starts listening for auctions
 +!monitor_auctions <-
     lookupArtifact("auction_space", AucArtID);
     focus(AucArtID);
     .println("[SA3] Connected to auction environment");
-    !listen_to_auctions.
+    !listen_loop.
 
-// Handles cases where auction environment is not yet available
-+!monitor_auctions : true <-
-    .println("[SA3] Waiting for auction environment to be created...");
+-!monitor_auctions <-
+    .println("[SA3] Waiting for auction environment...");
     .wait(500);
     !monitor_auctions.
 
-// Continuously listens for new auction notifications
-+!listen_to_auctions <-
++!listen_loop <-
     .wait(500);
-    !listen_to_auctions.
+    !listen_loop.
 
-// Responds to new auction announcements by evaluating bidding opportunities
+// ========== AUCTION HANDLING ==========
+
 +auction_open(AuctionID) : supplier_id(SID) <-
     .println("[SA3] New auction detected: ", AuctionID);
     !evaluate_bid(AuctionID, SID).
 
-// Prepares for bid evaluation by accessing auction details
-+!evaluate_bid(AuctionID, SID) : true <-
++!evaluate_bid(AuctionID, SID) <-
     lookupArtifact("auction_space", AucArtID);
     focus(AucArtID);
     .wait(100);
     !maybe_submit_bid(AuctionID, SID).
 
-// Retrieves auction details and initiates bid checking process
 +!maybe_submit_bid(AuctionID, SID) <-
     lookupArtifact("auction_space", AucArtID);
     focus(AucArtID);
-    
     getAuctionDetails(AuctionID)[artifact_id(AucArtID)];
     .wait(200);
-    
     !check_and_bid(AuctionID, SID).
 
-// Evaluates if agent can supply the requested part and submits bid if capable
-+!check_and_bid(AuctionID, SID) :
-    auction_part_type(PartType) <-
-    
++!check_and_bid(AuctionID, SID) : auction_part_type(PartType) <-
     .println("[SA3] Evaluating auction for part: ", PartType);
-    
-    // Convert string to atom for belief matching
     .term2string(PartAtom, PartType);
     
     if (can_supply(PartAtom, Price, Delivery, Rep)) {
         .println("[SA3] Can supply ", PartAtom, " @ $", Price, ", delivery: ", Delivery, "h");
         lookupArtifact("auction_space", AucArtID);
         submitBid(AuctionID, SID, Price, Delivery)[artifact_id(AucArtID)];
-        .println("[SA3] Bid submitted successfully");
+        .println("[SA3] Bid submitted successfully")
     } else {
-        // Fallback: try direct variable matching
         if (can_supply(PartType, Price2, Delivery2, Rep2)) {
             .println("[SA3] Can supply ", PartType, " @ $", Price2, ", delivery: ", Delivery2, "h");
             lookupArtifact("auction_space", AucArtID);
             submitBid(AuctionID, SID, Price2, Delivery2)[artifact_id(AucArtID)];
-            .println("[SA3] Bid submitted successfully (fallback)");
+            .println("[SA3] Bid submitted (fallback)")
         } else {
-            .println("[SA3] Cannot supply ", PartType, " - skipping auction");
+            .println("[SA3] Cannot supply ", PartType)
         }
     }.
 
-// Handles error cases where auction details are not available
 +!check_and_bid(AuctionID, SID) <-
-    .println("[SA3] ERROR: Could not retrieve auction details for ", AuctionID).
+    .println("[SA3] Could not get auction details").
 
-// Processes auction award notifications and updates contract records
 +auction_awarded(AuctionID) : supplier_id(SID) <-
     .println("[SA3] Contract awarded: ", AuctionID);
     +active_contract(AuctionID).
 
-// Logs auction closure events for tracking purposes
-+auction_closed(AuctionID) : true <-
++auction_closed(AuctionID) <-
     .println("[SA3] Auction closed: ", AuctionID).
+
+// ========== PHASE 4: DELIVERY ==========
+
++!deliver_part(OrderID, PartType, DeliveryTime) : supplier_id(SID) <-
+    .println("");
+    .println("[SA3] ┌────────────────────────────────────┐");
+    .println("[SA3] │  DELIVERY REQUEST                  │");
+    .println("[SA3] ├────────────────────────────────────┤");
+    .println("[SA3] │  Order: ", OrderID);
+    .println("[SA3] │  Part: ", PartType);
+    .println("[SA3] │  ETA: ", DeliveryTime, " hours");
+    .println("[SA3] └────────────────────────────────────┘");
+    
+    +delivering(OrderID, PartType);
+    
+    // Simulate delivery (50ms per hour)
+    DeliveryMs = DeliveryTime * 50;
+    .println("[SA3] Shipping... (", DeliveryMs, "ms)");
+    .wait(DeliveryMs);
+    
+    .println("[SA3] ✓ DELIVERED: ", PartType, " for ", OrderID);
+    
+    // Notify assembly agent
+    .send(aa1, tell, part_delivered(OrderID, PartType));
+    
+    -delivering(OrderID, PartType);
+    +delivered(OrderID, PartType).
+
+-!deliver_part(OrderID, PartType, DeliveryTime) : supplier_id(SID) <-
+    .println("[SA3] ERROR: Delivery failed for ", PartType);
+    .send(aa1, tell, delivery_failed(OrderID, PartType, SID)).

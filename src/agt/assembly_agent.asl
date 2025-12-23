@@ -33,6 +33,8 @@ processed_orders([]).
     .println("[AA] Confirmed: ", OrderID);
     !run_contracting(OrderID).
 
+// ==================== PHASE 2: CONTRACTING ====================
+
 +!run_contracting(OrderID) : true <-
     .println("[AA] Starting contracting for: ", OrderID);
     !request_parts(OrderID).
@@ -82,7 +84,7 @@ processed_orders([]).
     
     !request_optional_parts(Rails, Connectivity, OrderID, MaxCost, MaxDelivery, AucID).
 
-// Fallback if max_energy not available
+// Fallback without MaxEnergy
 +!process_order_cfps(OrderID) : 
     order_board_type(BoardType) &
     order_trunk_count(TrunkCount) &
@@ -98,7 +100,7 @@ processed_orders([]).
     lookupArtifact("auction_space", AucID);
     focus(AucID);
     
-    +order_details(OrderID, MaxCost, MaxDelivery, 200);  // Default energy
+    +order_details(OrderID, MaxCost, MaxDelivery, 200);
     +parts_needed(OrderID, board);
     +parts_needed(OrderID, trunk);
     +parts_needed(OrderID, wheels);
@@ -223,8 +225,6 @@ processed_orders([]).
     .println("[AA] Selected suppliers: ", Suppliers);
     
     .println("[AA] Ready for Phase 3: Allocating workstations");
-    
-    // Start Phase 3
     !start_workstation_allocation(OrderID).
 
 // ==================== PHASE 3: WORKSTATION ALLOCATION ====================
@@ -232,13 +232,8 @@ processed_orders([]).
 +!start_workstation_allocation(OrderID) <-
     .println("[AA] ===== PHASE 3: WORKSTATION ALLOCATION FOR ORDER: ", OrderID, " =====");
     
-    // Connect to existing registry
     !ensure_registry_connected;
-    
-    // Determine assembly sequence based on order parts
     !determine_assembly_sequence(OrderID);
-    
-    // Start allocating workstations
     !allocate_workstations_for_order(OrderID).
 
 +!ensure_registry_connected <-
@@ -248,11 +243,10 @@ processed_orders([]).
     .println("[AA] Connected to workstation registry").
 
 -!ensure_registry_connected <-
-    .println("[AA] ERROR: Could not connect to registry, retrying...");
+    .println("[AA] Registry not available, retrying...");
     .wait(1000);
     !ensure_registry_connected.
 
-// Assembly sequence determination
 +!determine_assembly_sequence(OrderID) : 
     parts_needed(OrderID, rails) & parts_needed(OrderID, connectivity) <-
     +assembly_sequence(OrderID, [trunk, wheels, rails, connectivity, quality]);
@@ -272,7 +266,6 @@ processed_orders([]).
     +assembly_sequence(OrderID, [trunk, wheels, quality]);
     .println("[AA] Basic assembly sequence: trunk -> wheels -> quality").
 
-// Allocate all workstations for order
 +!allocate_workstations_for_order(OrderID) : assembly_sequence(OrderID, Sequence) <-
     .println("[AA] Allocating workstations for sequence: ", Sequence);
     !allocate_sequence_workstations(OrderID, Sequence).
@@ -280,19 +273,20 @@ processed_orders([]).
 +!allocate_sequence_workstations(OrderID, []) <-
     .println("[AA] ===== ALL WORKSTATIONS ALLOCATED FOR ORDER: ", OrderID, " =====");
     
-    // Show allocation summary
     .findall([Type, WS], workstation_allocated(OrderID, Type, WS), Allocations);
     .println("[AA] Allocated workstations: ", Allocations);
     
     +all_workstations_allocated(OrderID);
-    .println("[AA] Ready for Phase 4: Assembly execution").
+    .println("[AA] Ready for Phase 4: Assembly execution");
+    
+    // Start Phase 4
+    !start_assembly_execution(OrderID).
 
 +!allocate_sequence_workstations(OrderID, [StationType|Rest]) <-
     .println("[AA] Allocating ", StationType, " workstation...");
     !allocate_single_workstation(OrderID, StationType);
     !allocate_sequence_workstations(OrderID, Rest).
 
-// Allocate a single workstation type
 +!allocate_single_workstation(OrderID, StationType) : order_details(OrderID, _, _, MaxEnergy) <-
     lookupArtifact("workstation_registry", RegID);
     focus(RegID);
@@ -303,7 +297,6 @@ processed_orders([]).
     
     !try_allocate_best_workstation(OrderID, StationType).
 
-// Fallback if order_details doesn't have energy
 +!allocate_single_workstation(OrderID, StationType) <-
     lookupArtifact("workstation_registry", RegID);
     focus(RegID);
@@ -314,7 +307,6 @@ processed_orders([]).
     
     !try_allocate_best_workstation(OrderID, StationType).
 
-// Use the best_workstation observable property directly
 +!try_allocate_best_workstation(OrderID, StationType) : 
     best_workstation(BestWS) & BestWS \== "none" & available_count(Count) & Count > 0 <-
     
@@ -324,11 +316,9 @@ processed_orders([]).
     allocateWorkstation(BestWS, OrderID)[artifact_id(RegID)];
     .wait(100);
     
-    // Check allocation result
     ?allocation_result(Result);
     !handle_allocation_result(OrderID, StationType, BestWS, Result).
 
-// No workstations available
 +!try_allocate_best_workstation(OrderID, StationType) : 
     best_workstation("none") <-
     .println("[AA] No ", StationType, " workstations available - waiting...");
@@ -341,13 +331,11 @@ processed_orders([]).
     .wait(2000);
     !allocate_single_workstation(OrderID, StationType).
 
-// Fallback
 +!try_allocate_best_workstation(OrderID, StationType) <-
     .println("[AA] Waiting for workstation data...");
     .wait(1000);
     !allocate_single_workstation(OrderID, StationType).
 
-// Handle allocation result
 +!handle_allocation_result(OrderID, StationType, WS, "success") <-
     +workstation_allocated(OrderID, StationType, WS);
     .println("[AA] ✓ ", StationType, " workstation ", WS, " allocated to ", OrderID).
@@ -361,3 +349,166 @@ processed_orders([]).
     .println("[AA] ✗ Allocation failed: ", Result, " - retrying...");
     .wait(1000);
     !allocate_single_workstation(OrderID, StationType).
+
+// ==================== PHASE 4: ASSEMBLY EXECUTION ====================
+
++!start_assembly_execution(OrderID) <-
+    .println("");
+    .println("[AA] ╔════════════════════════════════════════════════════════════╗");
+    .println("[AA] ║     PHASE 4: ASSEMBLY EXECUTION FOR ORDER: ", OrderID, "       ║");
+    .println("[AA] ╚════════════════════════════════════════════════════════════╝");
+    
+    // Step 1: Request delivery of all parts from suppliers
+    !request_all_deliveries(OrderID);
+    
+    // Step 2: Wait for all parts to be delivered
+    !wait_for_all_parts(OrderID);
+    
+    // Step 3: Execute assembly sequence on workstations
+    ?assembly_sequence(OrderID, Sequence);
+    .println("[AA] All parts delivered! Starting assembly sequence: ", Sequence);
+    !execute_assembly_sequence(OrderID, Sequence).
+
+// ========== PART DELIVERY ==========
+
++!request_all_deliveries(OrderID) <-
+    .println("[AA] ─── Requesting part deliveries ───");
+    
+    .findall([Part, Supplier, Price, Delivery], 
+             supplier_selected(OrderID, Part, Supplier, Price, Delivery), 
+             Suppliers);
+    
+    !send_delivery_requests(OrderID, Suppliers).
+
++!send_delivery_requests(OrderID, []) <-
+    .println("[AA] All delivery requests sent").
+
++!send_delivery_requests(OrderID, [[Part, Supplier, Price, Delivery]|Rest]) <-
+    .println("[AA] → Requesting ", Part, " from ", Supplier, " (ETA: ", Delivery, "h)");
+    
+    // Convert supplier string to atom for messaging
+    .term2string(SupplierAtom, Supplier);
+    .send(SupplierAtom, achieve, deliver_part(OrderID, Part, Delivery));
+    
+    +awaiting_part(OrderID, Part);
+    !send_delivery_requests(OrderID, Rest).
+
+// ========== WAIT FOR PARTS ==========
+
++!wait_for_all_parts(OrderID) <-
+    .findall(Part, awaiting_part(OrderID, Part), AwaitingParts);
+    !check_parts_status(OrderID, AwaitingParts).
+
++!check_parts_status(OrderID, []) <-
+    .println("[AA] ✓ All parts have been delivered for order: ", OrderID).
+
++!check_parts_status(OrderID, AwaitingParts) <-
+    .length(AwaitingParts, Count);
+    .println("[AA] Waiting for ", Count, " parts: ", AwaitingParts);
+    .wait(500);
+    .findall(Part, awaiting_part(OrderID, Part), StillAwaiting);
+    !check_parts_status(OrderID, StillAwaiting).
+
+// Handle part delivery confirmation from suppliers
++part_delivered(OrderID, PartType)[source(Supplier)] <-
+    .println("[AA] ✓ DELIVERED: ", PartType, " from ", Supplier);
+    -awaiting_part(OrderID, PartType);
+    +part_ready(OrderID, PartType).
+
+// ========== EXECUTE ASSEMBLY SEQUENCE ==========
+
++!execute_assembly_sequence(OrderID, []) <-
+    .println("");
+    .println("[AA] ╔════════════════════════════════════════════════════════════╗");
+    .println("[AA] ║         ASSEMBLY COMPLETE FOR ORDER: ", OrderID, "             ║");
+    .println("[AA] ╚════════════════════════════════════════════════════════════╝");
+    !finalize_order(OrderID).
+
++!execute_assembly_sequence(OrderID, [StationType|Rest]) <-
+    .println("");
+    .println("[AA] ─── Executing ", StationType, " operation ───");
+    
+    ?workstation_allocated(OrderID, StationType, WorkstationID);
+    .println("[AA] Workstation: ", WorkstationID);
+    
+    // Send execute request to workstation agent
+    .term2string(WSAtom, WorkstationID);
+    .send(WSAtom, achieve, execute_operation(OrderID, StationType));
+    
+    // Wait for completion
+    +awaiting_workstation(OrderID, StationType, WorkstationID);
+    !wait_for_workstation(OrderID, StationType, WorkstationID);
+    
+    // Release the workstation back to the pool
+    !release_workstation(OrderID, StationType, WorkstationID);
+    
+    // Continue with next operation
+    !execute_assembly_sequence(OrderID, Rest).
+
+// Wait for workstation completion
++!wait_for_workstation(OrderID, StationType, WorkstationID) : 
+    workstation_done(OrderID, StationType) <-
+    .println("[AA] ✓ ", StationType, " operation completed");
+    -awaiting_workstation(OrderID, StationType, WorkstationID);
+    -workstation_done(OrderID, StationType).
+
++!wait_for_workstation(OrderID, StationType, WorkstationID) <-
+    .wait(300);
+    !wait_for_workstation(OrderID, StationType, WorkstationID).
+
+// Handle workstation completion message
++workstation_complete(OrderID, StationType, WorkstationID)[source(WS)] <-
+    .println("[AA] Received completion signal from ", WorkstationID);
+    +workstation_done(OrderID, StationType).
+
+// Release workstation
++!release_workstation(OrderID, StationType, WorkstationID) <-
+    lookupArtifact("workstation_registry", RegID);
+    releaseWorkstation(WorkstationID)[artifact_id(RegID)];
+    .println("[AA] Released: ", WorkstationID);
+    -workstation_allocated(OrderID, StationType, WorkstationID).
+
+// ========== FINALIZE ORDER ==========
+
++!finalize_order(OrderID) <-
+    // Calculate totals
+    .findall(Price, supplier_selected(OrderID, _, _, Price, _), Prices);
+    !sum_list(Prices, TotalCost);
+    
+    .findall(Delivery, supplier_selected(OrderID, _, _, _, Delivery), Deliveries);
+    !max_list(Deliveries, MaxDelivery);
+    
+    .println("");
+    .println("[AA] ════════════════════════════════════════════════════════════");
+    .println("[AA]  ORDER SUMMARY: ", OrderID);
+    .println("[AA]  Total Cost: $", TotalCost);
+    .println("[AA]  Delivery Time: ", MaxDelivery, " hours");
+    .println("[AA] ════════════════════════════════════════════════════════════");
+    
+    // Notify customer
+    .send(ca1, tell, order_completed(OrderID, TotalCost, MaxDelivery));
+    
+    // Cleanup
+    !cleanup_order(OrderID);
+    
+    .println("[AA] ✓ Customer notified - Order ", OrderID, " complete!").
+
+// Helper functions
++!sum_list([], 0).
++!sum_list([H|T], Sum) <-
+    !sum_list(T, RestSum);
+    Sum = H + RestSum.
+
++!max_list([X], X).
++!max_list([H|T], Max) <-
+    !max_list(T, TMax);
+    if (H > TMax) { Max = H } else { Max = TMax }.
+
++!cleanup_order(OrderID) <-
+    .abolish(supplier_selected(OrderID, _, _, _, _));
+    .abolish(parts_needed(OrderID, _));
+    .abolish(part_ready(OrderID, _));
+    .abolish(assembly_sequence(OrderID, _));
+    .abolish(all_workstations_allocated(OrderID));
+    .abolish(order_details(OrderID, _, _, _));
+    -raw_order(OrderID).
