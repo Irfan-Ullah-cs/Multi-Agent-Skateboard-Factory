@@ -18,13 +18,45 @@
     
 //     asl-path: "src/agt"
 // }
-
 mas skateboard_phase1 {
     agent ca1: customer_agent.asl
     agent aa1: assembly_agent.asl
     agent sa1: sa1.asl
     agent sa2: sa2.asl
     agent sa3: sa3.asl
+    
+    // Workstation Agents
+    agent wa1_trunk: workstation_agent.asl {
+        beliefs: workstation_id(wa1_trunk), workstation_type(trunk), energy_consumption(15), execution_time(20)
+    }
+    agent wa2_trunk: workstation_agent.asl {
+        beliefs: workstation_id(wa2_trunk), workstation_type(trunk), energy_consumption(12), execution_time(25)
+    }
+    
+    agent wa1_wheels: workstation_agent.asl {
+        beliefs: workstation_id(wa1_wheels), workstation_type(wheels), energy_consumption(10), execution_time(15)
+    }
+    agent wa2_wheels: workstation_agent.asl {
+        beliefs: workstation_id(wa2_wheels), workstation_type(wheels), energy_consumption(8), execution_time(18)
+    }
+    
+    agent wa1_rails: workstation_agent.asl {
+        beliefs: workstation_id(wa1_rails), workstation_type(rails), energy_consumption(18), execution_time(22)
+    }
+    agent wa2_rails: workstation_agent.asl {
+        beliefs: workstation_id(wa2_rails), workstation_type(rails), energy_consumption(20), execution_time(20)
+    }
+    
+    agent wa1_connectivity: workstation_agent.asl {
+        beliefs: workstation_id(wa1_connectivity), workstation_type(connectivity), energy_consumption(25), execution_time(30)
+    }
+    
+    agent wa1_quality: workstation_agent.asl {
+        beliefs: workstation_id(wa1_quality), workstation_type(quality), energy_consumption(5), execution_time(10)
+    }
+    agent wa2_quality: workstation_agent.asl {
+        beliefs: workstation_id(wa2_quality), workstation_type(quality), energy_consumption(7), execution_time(12)
+    }
     
     asl-path: "src/agt"
 }
