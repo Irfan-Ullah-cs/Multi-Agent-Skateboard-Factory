@@ -92,7 +92,9 @@ MASB/
 │   │       └── QualityCheck.java
 │   └── org/
 │       └── org.xml                 # Moise organization (optional)
-├── mASB.jcm         # JaCaMo project file
+├── doc                             # Report + ouput Logs
+├── visualization                   # UML Diagrams + Video + Screenshots
+├── mASB.jcm                        # JaCaMo project file
 ├── build.gradle                    # Gradle build configuration
 └── README.md
 ```
@@ -159,7 +161,7 @@ agent wa1_trunk: workstation_agent.asl {
 ## System Flow
 
 
-![Sequence Diagram](/visualization/sequence.png)
+![Sequence Diagram](/visualization/uml_diagrams/Sequence_Diagram.png)
 
 
 ## GUI Visualization
@@ -186,9 +188,9 @@ Each order gets its own visualization window showing:
 ## Sample Output
 
 ```
-Please See outputlog.txt file for output
+Please See doc/outputlog.txt file for output Logs
 ```
-
+![Visualization](/visualization/max_skateboard.png)
 ## Technologies Used
 
 - **Jason**: BDI agent programming language (AgentSpeak)
