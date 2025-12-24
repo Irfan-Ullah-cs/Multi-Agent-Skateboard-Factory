@@ -1,11 +1,13 @@
 // AuctionArtifact.java
 // Implements FIPA Contract Net Protocol for skateboard part procurement
 // Manages auction lifecycle from call-for-proposal to winner selection
+// FIXED: Uses OpFeedbackParam to prevent race condition in concurrent auctions
 
 package tools;
 
 import cartago.Artifact;
 import cartago.OPERATION;
+import cartago.OpFeedbackParam;
 import java.util.*;
 
 public class AuctionArtifact extends Artifact {
@@ -46,7 +48,7 @@ public class AuctionArtifact extends Artifact {
         openAuctions.add(auctionID);
         
         defineObsProperty("auction_open", auctionID);
-        System.out.println("[Auction] Call for Proposal created: " + auctionID + " for " + partType);
+        System.out.println("[Auction] CFP: " + auctionID + " for " + partType);
     }
     
     // Processes bid submissions from supply agents for open auctions
@@ -62,26 +64,25 @@ public class AuctionArtifact extends Artifact {
             bid.put("timestamp", System.currentTimeMillis());
             
             bids.get(auctionID).add(bid);
-            System.out.println("[Auction] Bid received: " + supplierID + " -> " + bidPrice + " for " + auctionID);
+            System.out.println("[Auction] Bid: " + supplierID + " -> $" + bidPrice + " for " + auctionID);
         }
     }
     
-    // Retrieves detailed information about a specific auction
+    // FIXED: Uses OpFeedbackParam to return part type directly to calling agent
+    // This prevents race condition when multiple agents call simultaneously
     @OPERATION
-    public void getAuctionDetails(String auctionID) {
+    public void getAuctionDetails(String auctionID, OpFeedbackParam<String> partTypeOut) {
         if (auctions.containsKey(auctionID)) {
             Map<String, Object> auction = auctions.get(auctionID);
             String partType = (String) auction.get("partType");
-            int quantity = (int) auction.get("quantity");
-            double maxPrice = (double) auction.get("maxPrice");
-            int maxDelivery = (int) auction.get("maxDelivery");
             
-            defineObsProperty("auction_part_type", partType);
-            defineObsProperty("auction_quantity", quantity);
-            defineObsProperty("auction_max_price", maxPrice);
-            defineObsProperty("auction_max_delivery", maxDelivery);
+            // Return value directly to calling agent - no shared property!
+            partTypeOut.set(partType);
             
-            System.out.println("[Auction] Details for " + auctionID + ": " + partType + " (qty:" + quantity + ")");
+            System.out.println("[Auction] Details for " + auctionID + ": " + partType);
+        } else {
+            partTypeOut.set("unknown");
+            System.out.println("[Auction] ERROR: Auction not found: " + auctionID);
         }
     }
     
@@ -111,14 +112,14 @@ public class AuctionArtifact extends Artifact {
                 int deliveryTime = (int) bid.get("deliveryTime");
                 String supplierID = (String) bid.get("supplierID");
                 
-                System.out.println("[Auction] Checking bid: " + supplierID + " @ $" + bidPrice + ", delivery: " + deliveryTime + "h");
+                System.out.println("[Auction] Checking: " + supplierID + " @ $" + bidPrice + ", " + deliveryTime + "h");
                 
                 // Check if bid meets constraints
                 if (bidPrice <= maxPrice && deliveryTime <= maxDelivery) {
                     if (bidPrice < bestPrice) {
                         bestPrice = bidPrice;
                         bestBid = bid;
-                        System.out.println("[Auction] New best bid: " + supplierID + " @ $" + bidPrice);
+                        System.out.println("[Auction] New best: " + supplierID + " @ $" + bidPrice);
                     }
                 }
             }
@@ -131,10 +132,10 @@ public class AuctionArtifact extends Artifact {
                 defineObsProperty("best_bid_supplier", winner);
                 defineObsProperty("best_bid_price", price);
                 defineObsProperty("best_bid_delivery", delivery);
-                System.out.println("[Auction] Best bid for " + auctionID + ": " + winner + " @ $" + price + ", delivery: " + delivery + "h");
+                System.out.println("[Auction] Winner for " + auctionID + ": " + winner + " @ $" + price);
             } else {
                 defineObsProperty("best_bid_supplier", "none");
-                System.out.println("[Auction] No valid bids for " + auctionID + " meeting constraints (budget: $" + maxPrice + ", deadline: " + maxDelivery + "h)");
+                System.out.println("[Auction] No valid bids for " + auctionID);
             }
         }
     }
@@ -144,23 +145,22 @@ public class AuctionArtifact extends Artifact {
     public void getAuctionIDForPart(String partType) {
         String auctionID = null;
         
-        // Find first matching auction for this part type
         for (String id : openAuctions) {
             if (auctions.containsKey(id)) {
                 String auctionPartType = (String) auctions.get(id).get("partType");
                 if (partType.equals(auctionPartType)) {
                     auctionID = id;
-                    break; // Take first match
+                    break;
                 }
             }
         }
         
         if (auctionID != null) {
             defineObsProperty("auction_id_for_part", auctionID);
-            System.out.println("[Auction] First open auction for " + partType + ": " + auctionID);
+            System.out.println("[Auction] Found auction for " + partType + ": " + auctionID);
         } else {
             defineObsProperty("auction_id_for_part", "not_found");
-            System.out.println("[Auction] No open auction found for part: " + partType);
+            System.out.println("[Auction] No auction for: " + partType);
         }
     }
     
@@ -175,7 +175,6 @@ public class AuctionArtifact extends Artifact {
             auction.put("winPrice", winPrice);
             auction.put("winDelivery", winDelivery);
             
-            // Remove from open auctions list
             openAuctions.remove(auctionID);
             
             defineObsProperty("auction_awarded", auctionID);
@@ -183,7 +182,7 @@ public class AuctionArtifact extends Artifact {
         }
     }
     
-    // Retrieves all bids for a specific auction for analysis purposes
+    // Retrieves all bids for a specific auction
     @OPERATION
     public void getAllBidsForAuction(String auctionID) {
         if (bids.containsKey(auctionID)) {
@@ -197,7 +196,6 @@ public class AuctionArtifact extends Artifact {
                 defineObsProperty("bid_" + i, bidInfo);
             }
             defineObsProperty("total_bids", auctionBids.size());
-            System.out.println("[Auction] Retrieved " + auctionBids.size() + " bids for " + auctionID);
         }
     }
     
@@ -207,6 +205,5 @@ public class AuctionArtifact extends Artifact {
         String auctionList = String.join(",", openAuctions);
         defineObsProperty("all_open_auctions", auctionList);
         defineObsProperty("total_open_auctions", openAuctions.size());
-        System.out.println("[Auction] Open auctions (" + openAuctions.size() + "): " + auctionList);
     }
 }
