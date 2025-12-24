@@ -49,7 +49,7 @@ can_supply(connectivity, 110, 20, 0.94).  // Price: $110, Delivery: 20h, Reputat
 +!maybe_submit_bid(AuctionID, SID) <-
     lookupArtifact("auction_space", AucArtID);
     focus(AucArtID);
-    getAuctionDetails(AuctionID)[artifact_id(AucArtID)];
+    getAuctionDetails(AuctionID, PartType)[artifact_id(AucArtID)];
     .wait(200);
     !check_and_bid(AuctionID, SID).
 

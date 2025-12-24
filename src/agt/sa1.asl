@@ -49,11 +49,10 @@ can_supply(connectivity, 120, 24, 0.91).  // Price: $120, Delivery: 24h, Reputat
 +!maybe_submit_bid(AuctionID, SID) <-
     lookupArtifact("auction_space", AucArtID);
     focus(AucArtID);
-    getAuctionDetails(AuctionID)[artifact_id(AucArtID)];
-    .wait(200);
-    !check_and_bid(AuctionID, SID).
+    getAuctionDetails(AuctionID, PartType)[artifact_id(AucArtID)];
+    !check_and_bid(AuctionID, SID, PartType).
 
-+!check_and_bid(AuctionID, SID) : auction_part_type(PartType) <-
++!check_and_bid(AuctionID, SID, PartType) : true <-
     .println("[SA1] Evaluating auction for part: ", PartType);
     .term2string(PartAtom, PartType);
     
@@ -73,7 +72,7 @@ can_supply(connectivity, 120, 24, 0.91).  // Price: $120, Delivery: 24h, Reputat
         }
     }.
 
-+!check_and_bid(AuctionID, SID) <-
++!check_and_bid(AuctionID, SID, PartType) <-
     .println("[SA1] Could not get auction details").
 
 +auction_awarded(AuctionID) : supplier_id(SID) <-
