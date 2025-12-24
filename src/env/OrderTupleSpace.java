@@ -79,6 +79,7 @@ public class OrderTupleSpace extends Artifact {
             System.out.println("[OrderTupleSpace] Error parsing spec: " + e.getMessage());
         }
     }
+    
     @OPERATION
     public void getOrderData(String orderID) {
         if (orders.containsKey(orderID)) {

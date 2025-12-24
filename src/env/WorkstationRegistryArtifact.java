@@ -4,6 +4,10 @@ import cartago.Artifact;
 import cartago.OPERATION;
 import java.util.*;
 
+/**
+ * WorkstationRegistryArtifact - Central registry for all workstations
+ * Tracks availability and handles allocation/release with mutual exclusion
+ */
 public class WorkstationRegistryArtifact extends Artifact {
     
     private Map<String, List<String>> workstationsByType;
@@ -16,14 +20,15 @@ public class WorkstationRegistryArtifact extends Artifact {
         workstationInfo = new HashMap<>();
         allocations = new HashMap<>();
         
-        // Initialize workstation types
+        // Initialize workstation type lists
         workstationsByType.put("trunk", new ArrayList<>());
         workstationsByType.put("wheels", new ArrayList<>());
         workstationsByType.put("rails", new ArrayList<>());
         workstationsByType.put("connectivity", new ArrayList<>());
         workstationsByType.put("quality", new ArrayList<>());
         
-        // Define all observable properties upfront with initial values
+        // IMPORTANT: Define ALL observable properties upfront with initial values
+        // This avoids the "invalid observable property" error
         defineObsProperty("registry_status", "initialized");
         defineObsProperty("available_workstations", "");
         defineObsProperty("available_count", 0);
@@ -35,17 +40,22 @@ public class WorkstationRegistryArtifact extends Artifact {
         System.out.println("[WorkstationRegistry] Registry initialized");
     }
     
+    /**
+     * Register a workstation with the registry
+     */
     @OPERATION
     public void registerWorkstation(String workstationID, String type, int energy, int time) {
-        // Add to type list if not already present
+        // Ensure type list exists
         if (!workstationsByType.containsKey(type)) {
             workstationsByType.put(type, new ArrayList<>());
         }
         
+        // Add workstation if not already registered
         if (!workstationsByType.get(type).contains(workstationID)) {
             workstationsByType.get(type).add(workstationID);
         }
         
+        // Store workstation info
         Map<String, Object> info = new HashMap<>();
         info.put("type", type);
         info.put("energy", energy);
@@ -57,6 +67,10 @@ public class WorkstationRegistryArtifact extends Artifact {
                           ") - Energy: " + energy + ", Time: " + time);
     }
     
+    /**
+     * Find available workstations of a given type within energy constraints
+     * Returns the best (lowest energy) workstation
+     */
     @OPERATION
     public void findAvailableWorkstations(String type, int maxEnergy) {
         List<String> available = new ArrayList<>();
@@ -76,19 +90,19 @@ public class WorkstationRegistryArtifact extends Artifact {
             }
         }
         
-        // Sort by energy consumption (lowest first) for optimal selection
+        // Sort by energy consumption (lowest first)
         available.sort((a, b) -> {
             int energyA = (Integer) workstationInfo.get(a).get("energy");
             int energyB = (Integer) workstationInfo.get(b).get("energy");
             return Integer.compare(energyA, energyB);
         });
         
-        // Update observable properties (they already exist from init)
+        // Update observable properties using updateObsProperty (NOT remove/define)
         String availableList = String.join(",", available);
         updateObsProperty("available_workstations", availableList);
         updateObsProperty("available_count", available.size());
         
-        // Provide the BEST (lowest energy) workstation directly
+        // Set best workstation (first in sorted list = lowest energy)
         if (!available.isEmpty()) {
             String bestWS = available.get(0);
             int bestEnergy = (Integer) workstationInfo.get(bestWS).get("energy");
@@ -109,6 +123,9 @@ public class WorkstationRegistryArtifact extends Artifact {
         }
     }
     
+    /**
+     * Allocate a workstation to an order (with mutual exclusion)
+     */
     @OPERATION
     public void allocateWorkstation(String workstationID, String orderID) {
         if (workstationInfo.containsKey(workstationID)) {
@@ -116,21 +133,26 @@ public class WorkstationRegistryArtifact extends Artifact {
             boolean isAvailable = (Boolean) info.get("available");
             
             if (isAvailable) {
+                // Mark as allocated
                 info.put("available", false);
                 allocations.put(workstationID, orderID);
+                
                 updateObsProperty("allocation_result", "success");
-                System.out.println("[Registry] ✓ Allocated " + workstationID + " to order: " + orderID);
+                System.out.println("[Registry]  Allocated " + workstationID + " to order: " + orderID);
             } else {
                 String currentOrder = allocations.get(workstationID);
                 updateObsProperty("allocation_result", "busy");
-                System.out.println("[Registry] ✗ " + workstationID + " busy with order: " + currentOrder);
+                System.out.println("[Registry]  " + workstationID + " busy with order: " + currentOrder);
             }
         } else {
             updateObsProperty("allocation_result", "not_found");
-            System.out.println("[Registry] ✗ Workstation not found: " + workstationID);
+            System.out.println("[Registry]  Workstation not found: " + workstationID);
         }
     }
     
+    /**
+     * Release a workstation back to the pool
+     */
     @OPERATION
     public void releaseWorkstation(String workstationID) {
         if (workstationInfo.containsKey(workstationID)) {
@@ -140,6 +162,9 @@ public class WorkstationRegistryArtifact extends Artifact {
         }
     }
     
+    /**
+     * Get current registry status (for debugging)
+     */
     @OPERATION
     public void getRegistryStatus() {
         int totalWorkstations = workstationInfo.size();

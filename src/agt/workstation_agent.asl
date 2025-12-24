@@ -1,6 +1,7 @@
 { include("$jacamoJar/templates/common-cartago.asl") }
 
-// Agent beliefs come from MAS file parameters
+// Beliefs are passed from .jcm file:
+// workstation_id, workstation_type, energy_consumption, execution_time
 
 !start.
 
@@ -9,59 +10,107 @@
     .println("[", WSID, "] Workstation agent started - Type: ", Type);
     
     // Create unique artifact for this workstation
-    .concat("ws_", WSID, ArtifactName);
+    .concat("ws_artifact_", WSID, ArtifactName);
     makeArtifact(ArtifactName, "tools.WorkstationArtifact", [Type, Energy, Time], WSArtID);
     focus(WSArtID);
-    +my_workstation_artifact(ArtifactName, WSArtID);
+    +my_artifact(ArtifactName, WSArtID);
+    +my_energy(Energy);
+    +my_time(Time);
     
-    // Wait for assembly agent to create registry
+    // Wait for registry to be created by assembly agent
     .wait(2000);
     
     // Register with the registry
     !register_with_registry(WSID, Type, Energy, Time);
     
-    // Start monitoring for work requests
-    !monitor_for_work.
+    // Ready for work
+    !idle_loop.
 
-// Register with the workstation registry
+// Register with workstation registry
 +!register_with_registry(WSID, Type, Energy, Time) <-
     .println("[", WSID, "] Attempting to register with registry...");
     lookupArtifact("workstation_registry", RegID);
     focus(RegID);
     registerWorkstation(WSID, Type, Energy, Time)[artifact_id(RegID)];
-    .println("[", WSID, "] ✓ Successfully registered with registry");
-    +registered_successfully.
+    .println("[", WSID, "]  Successfully registered with registry");
+    +registered.
 
-// Retry registration if it fails
 -!register_with_registry(WSID, Type, Energy, Time) <-
-    .println("[", WSID, "] Registry not available yet, retrying in 2s...");
+    .println("[", WSID, "] Registry not ready, retrying in 2s...");
     .wait(2000);
     !register_with_registry(WSID, Type, Energy, Time).
 
-// Monitor for execution requests
-+!monitor_for_work : workstation_id(WSID) <-
-    .wait(1000);
-    !monitor_for_work.
+// Idle loop - just keeps agent alive
++!idle_loop <-
+    .wait(5000);
+    !idle_loop.
 
-// Handle execution trigger from assembly agent
-+execute_request(OrderID, WSID) : 
+// ==================== PHASE 4: EXECUTION ====================
+
+// Handle execute_operation request from assembly agent
++!execute_operation(OrderID, StationType) : 
     workstation_id(WSID) & 
-    my_workstation_artifact(ArtName, ArtID) <-
+    my_artifact(ArtName, ArtID) &
+    my_time(ExecTime) &
+    my_energy(Energy) <-
     
-    .println("[", WSID, "] Received execution request for order: ", OrderID);
+    .println("");
+    .println("[", WSID, "]");
+    .println("[", WSID, "]   EXECUTING OPERATION                 ");
+    .println("[", WSID, "] ");
+    .println("[", WSID, "]   Order: ", OrderID);
+    .println("[", WSID, "]   Type: ", StationType);
+    .println("[", WSID, "]   Duration: ", ExecTime, " time units");
+    .println("[", WSID, "]   Energy: ", Energy, " units");
+    .println("[", WSID, "] ");
     
-    // Execute the workstation operation
+    // Mark as busy
+    +executing(OrderID, StationType);
+    
+    // Execute on artifact
     execute[artifact_id(ArtID)];
     
-    .println("[", WSID, "] ✓ Completed execution for order: ", OrderID);
+    // Simulate execution time (scaled: 100ms per time unit)
+    ExecutionMs = ExecTime * 100;
+    .println("[", WSID, "] Processing... (", ExecutionMs, "ms)");
+    .wait(ExecutionMs);
+    
+    .println("[", WSID, "]  Operation complete!");
+    
+    // Mark as done
+    -executing(OrderID, StationType);
     
     // Notify assembly agent
-    .send(aa1, tell, workstation_execution_complete(OrderID, WSID)).
+    .send(aa1, tell, workstation_complete(OrderID, StationType, WSID));
+    
+    .println("[", WSID, "] Notified assembly agent").
 
-// React to being allocated (from registry observable property)
-+allocation_success(WSID) : workstation_id(WSID) <-
-    .println("[", WSID, "] Allocation confirmed by registry").
+// Fallback without timing info
++!execute_operation(OrderID, StationType) : 
+    workstation_id(WSID) & 
+    my_artifact(ArtName, ArtID) <-
+    
+    .println("[", WSID, "] Executing ", StationType, " for order: ", OrderID);
+    
+    +executing(OrderID, StationType);
+    
+    execute[artifact_id(ArtID)];
+    .wait(1500);
+    
+    -executing(OrderID, StationType);
+    
+    .send(aa1, tell, workstation_complete(OrderID, StationType, WSID));
+    .println("[", WSID, "]  Complete").
 
-// For debugging - show workstation status periodically
-+!show_status : workstation_id(WSID) & workstation_type(Type) <-
-    .println("[", WSID, "] Status check - Type: ", Type, ", Registered: ", registered_successfully).
+// Error handler
+-!execute_operation(OrderID, StationType) : workstation_id(WSID) <-
+    .println("[", WSID, "] ERROR: Failed to execute for order: ", OrderID);
+    .send(aa1, tell, workstation_failed(OrderID, StationType, WSID)).
+
+// Status query (for debugging)
++!status : workstation_id(WSID) & workstation_type(Type) <-
+    if (executing(Order, Op)) {
+        .println("[", WSID, "] BUSY - Order: ", Order, ", Op: ", Op)
+    } else {
+        .println("[", WSID, "] IDLE - Type: ", Type)
+    }.

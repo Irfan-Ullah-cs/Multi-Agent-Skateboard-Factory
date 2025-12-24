@@ -2,87 +2,145 @@ package tools;
 
 import cartago.Artifact;
 import cartago.OPERATION;
-import java.util.*;
+import cartago.OpFeedbackParam;
 
+/**
+ * WorkstationArtifact - Represents a physical workstation in the assembly plant
+ * Each workstation can execute one assembly operation at a time
+ */
 public class WorkstationArtifact extends Artifact {
     
-    private String workstationType;
+    private String type;
     private int energyConsumption;
     private int executionTime;
     private boolean isAvailable;
-    private String currentOrderID;
+    private String currentOrder;
     
+    /**
+     * Initialize workstation with its properties
+     * @param type - workstation type (trunk, wheels, rails, connectivity, quality)
+     * @param energy - energy consumption per operation
+     * @param time - execution time per operation
+     */
     @OPERATION
     public void init(String type, int energy, int time) {
-        this.workstationType = type;
+        this.type = type;
         this.energyConsumption = energy;
         this.executionTime = time;
         this.isAvailable = true;
-        this.currentOrderID = null;
+        this.currentOrder = null;
         
-        defineObsProperty("workstation_type", type);
-        defineObsProperty("energy_consumption", energy);
-        defineObsProperty("execution_time", time);
-        defineObsProperty("is_available", true);
-        defineObsProperty("current_order", "none");
+        // Define observable properties
+        defineObsProperty("ws_type", type);
+        defineObsProperty("ws_energy", energy);
+        defineObsProperty("ws_time", time);
+        defineObsProperty("ws_available", true);
+        defineObsProperty("ws_current_order", "none");
+        defineObsProperty("ws_status", "idle");
         
-        System.out.println("[Workstation] " + type + " workstation initialized - Energy: " + energy + ", Time: " + time);
+        System.out.println("[Workstation] " + type + " workstation initialized - Energy: " + 
+                          energy + ", Time: " + time);
     }
     
-    @OPERATION
-    public void allocateToOrder(String orderID) {
-        if (isAvailable) {
-            isAvailable = false;
-            currentOrderID = orderID;
-            updateObsProperty("is_available", false);
-            updateObsProperty("current_order", orderID);
-            defineObsProperty("allocation_result", "success");
-            System.out.println("[Workstation] " + workstationType + " allocated to order: " + orderID);
-        } else {
-            defineObsProperty("allocation_result", "busy");
-            System.out.println("[Workstation] " + workstationType + " allocation failed - already busy with: " + currentOrderID);
-        }
-    }
-    
+    /**
+     * Execute an assembly operation
+     * Locks the workstation during execution
+     */
     @OPERATION
     public void execute() {
-        if (!isAvailable && currentOrderID != null) {
-            System.out.println("[Workstation] " + workstationType + " executing for order: " + currentOrderID + " (time: " + executionTime + "ms, energy: " + energyConsumption + ")");
-            
-            // Simulate execution time
-            try {
-                Thread.sleep(executionTime * 100); // Scale down for demo
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            
-            // Complete execution
-            isAvailable = true;
-            String completedOrder = currentOrderID;
-            currentOrderID = null;
-            
-            updateObsProperty("is_available", true);
-            updateObsProperty("current_order", "none");
-            defineObsProperty("execution_complete", completedOrder);
-            
-            System.out.println("[Workstation] " + workstationType + " completed execution for order: " + completedOrder);
+        if (!isAvailable) {
+            System.out.println("[Workstation] ERROR: Workstation busy with order: " + currentOrder);
+            return;
+        }
+        
+        // Lock workstation
+        isAvailable = false;
+        updateObsProperty("ws_available", false);
+        updateObsProperty("ws_status", "executing");
+        
+        System.out.println("[Workstation] " + type + " executing operation...");
+        
+        // Note: The actual wait/delay is handled by the agent
+        // This just updates the state
+        
+        // Unlock workstation
+        isAvailable = true;
+        updateObsProperty("ws_available", true);
+        updateObsProperty("ws_status", "idle");
+        updateObsProperty("ws_current_order", "none");
+        
+        System.out.println("[Workstation] " + type + " operation complete");
+    }
+    
+    /**
+     * Execute operation for a specific order
+     */
+    @OPERATION
+    public void executeForOrder(String orderID) {
+        if (!isAvailable) {
+            System.out.println("[Workstation] ERROR: Busy with order: " + currentOrder);
+            failed("workstation_busy");
+            return;
+        }
+        
+        currentOrder = orderID;
+        isAvailable = false;
+        
+        updateObsProperty("ws_available", false);
+        updateObsProperty("ws_current_order", orderID);
+        updateObsProperty("ws_status", "executing");
+        
+        System.out.println("[Workstation] " + type + " executing for order: " + orderID);
+    }
+    
+    /**
+     * Complete the current operation
+     */
+    @OPERATION
+    public void completeOperation() {
+        System.out.println("[Workstation] " + type + " completed order: " + currentOrder);
+        
+        currentOrder = null;
+        isAvailable = true;
+        
+        updateObsProperty("ws_available", true);
+        updateObsProperty("ws_current_order", "none");
+        updateObsProperty("ws_status", "idle");
+    }
+    
+    /**
+     * Get workstation status
+     */
+    @OPERATION
+    public void getStatus(OpFeedbackParam<String> status) {
+        if (isAvailable) {
+            status.set("available");
+        } else {
+            status.set("busy:" + currentOrder);
         }
     }
     
+    /**
+     * Check if workstation is available
+     */
     @OPERATION
-    public void getWorkstationInfo() {
-        defineObsProperty("ws_type", workstationType);
-        defineObsProperty("ws_energy", energyConsumption);
-        defineObsProperty("ws_time", executionTime);
-        defineObsProperty("ws_available", isAvailable);
+    public void isAvailable(OpFeedbackParam<Boolean> available) {
+        available.set(isAvailable);
     }
     
+    /**
+     * Get energy consumption
+     */
+    @OPERATION  
+    public void getEnergy(OpFeedbackParam<Integer> energy) {
+        energy.set(energyConsumption);
+    }
+    
+    /**
+     * Get execution time
+     */
     @OPERATION
-    public void releaseWorkstation() {
-        isAvailable = true;
-        currentOrderID = null;
-        updateObsProperty("is_available", true);
-        updateObsProperty("current_order", "none");
-        System.out.println("[Workstation] " + workstationType + " released and available");
+    public void getTime(OpFeedbackParam<Integer> time) {
+        time.set(executionTime);
     }
 }
