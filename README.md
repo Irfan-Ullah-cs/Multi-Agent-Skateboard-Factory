@@ -220,5 +220,5 @@ This project is developed for educational purposes as part of the MAC 2025 cours
 - [x] Phase 1: Order Intake
 - [x] Phase 2: Supplier Contracting (FIPA Contract Net)
 - [x] Phase 3: Workstation Allocation
-- [x] Phase 4: Assembly Execution with GUI
-- [x] Phase 5: Moise Organization (Optional)
+- [x] Phase 4: Assembly Execution 
+- [x] Phase 5: GUI + Moise Organization (Optional)
